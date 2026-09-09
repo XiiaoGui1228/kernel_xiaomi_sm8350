@@ -1,6 +1,10 @@
 name: Build SukiSU-Ultra
 on:
   workflow_dispatch:
+    inputs:
+      config_file:
+        description: '上传内核config文件'
+        type: file
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,12 +14,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply SukiSU-Ultra patch (non-gki / non-gki for vili)
+      - name: Download uploaded kernel config
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.inputs.config_file }}
+        if: github.event.inputs.config_file != ''
+
+      - name: Apply SukiSU-Ultra non-gki patch
         run: |
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s non-gki
 
-      - name: Upload your kernel config
+      - name: Setup Android Kernel Build Env
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential libssl-dev bison flex bc python3
+
+      - name: Build kernel
+        run: |
+          cp config .config
+          make -j$(nproc)
+
+      - name: Upload boot.img artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-config
-          path: config
+          name: boot-img
+          path: arch/arm64/boot/boot.img
